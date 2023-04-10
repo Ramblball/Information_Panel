@@ -1,0 +1,59 @@
+version: '3.7'
+
+services:
+  grafana:
+    build: './config/grafana'
+    user: 'root'
+    ports:
+      - "3000:3000"
+    volumes:
+      - .config/grafana:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      monitoring:
+        aliases:
+          - grafana
+  prometheus:
+    image: prom/prometheus
+    user: 'root'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      monitoring:
+        aliases:
+          - prometheus
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    env_file:
+      - .env
+    networks:
+      monitoring:
+        aliases:
+          - postgres
+  app:
+    build:
+      context: .
+      dockerfile: ./config/app/Dockerfile
+      target: backend
+    restart: always
+    environment:
+      jargs: -agentlib:jdwp=transport=dt_socket,server=y,address=5005,suspend=n -Djava.security.egd=file:/dev/./urandom -XX:+ExitOnOutOfMemoryError -XX:+HeapDumpOnOutOfMemoryError
+    env_file:
+      - .env
+    ports:
+      - "8080:${SERVER_PORT}"
+    depends_on:
+      - postgres
+    links:
+      - postgres
+    networks:
+      monitoring:
+        aliases:
+          - app
+networks:
+  monitoring:
